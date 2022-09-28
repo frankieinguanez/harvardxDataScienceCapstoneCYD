@@ -60,7 +60,7 @@ load("dryBeans.RData")
 
 # **Introduction** 
 
-This report documents the research undertaken for the MovieLens project submission in part fulfillment of the Harvard PH125.9x Data Science: Capstone module by the author, Frankie Inguanez. The data set chosen is the Dry Beans data set archived on the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/data sets/Dry+Bean+data set) and researched by @KOKLU2020105507;. The objective of this data set is to correctly classify seven types of dry beans using 16 features which were extracted using computer vision. These features describe 12 dimension and 4 shape characteristics of each observation.
+This report documents the research undertaken for the MovieLens project submission in part fulfillment of the Harvard PH125.9x Data Science: Capstone module by the author, Frankie Inguanez. The data set chosen is the Dry Beans data set archived on the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Dry+Bean+dataset) and researched by @KOKLU2020105507;. The objective of this data set is to correctly classify seven types of dry beans using 16 features which were extracted using computer vision. These features describe 12 dimension and 4 shape characteristics of each observation.
 
 The authors of the published research considered a number of classifers with overall accuracies ranging from 87.92% to 93.13%. The classifiers considered were Multilayer perceptron, Support Vector Machine, k_Nearest Neighbors and Decision Trees. The authors of the published research also made use of 10-fold cross validation.
 
