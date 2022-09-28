@@ -1,0 +1,319 @@
+---
+title: "\\vspace{2in} Choose Your Own Project"
+subtitle: "Harvard PH125.9x Data Science: Capstone"
+author: "Frankie Inguanez"
+date: "`r Sys.Date()`"
+output:
+  bookdown::pdf_document2:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+    fig_caption: yes
+bibliography: references.bib 
+fontsize: 11pt
+include-before: '`\newpage{}`{=latex}'
+urlcolor: blue
+
+header-includes:
+  \usepackage[nottoc]{tocbibind}
+  \pagenumbering{gobble}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      fig.align="center", out.width="80%")
+##########################################################
+# Global Variables
+##########################################################
+options(digits = 5)
+
+##########################################################
+# Data acquisition and setup
+##########################################################
+
+# Download libraries
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(psych)) install.packages("psych", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(randomForest)) install.packages("randomForest", repos = "http://cran.us.r-project.org")
+if(!require(xgboost)) install.packages("xgboost", repos = "http://cran.us.r-project.org")
+
+library(tidyverse)
+library(caret)
+library(data.table)
+library(psych)
+library(caret)
+library(randomForest)
+library(xgboost)
+library(knitr)
+
+# Load presaved data instead of running entire script
+load("dryBeans.RData")
+```
+
+\listoffigures
+
+\newpage
+\pagenumbering{arabic}
+
+# **Introduction** 
+
+This report documents the research undertaken for the MovieLens project submission in part fulfillment of the Harvard PH125.9x Data Science: Capstone module by the author, Frankie Inguanez. The data set chosen is the Dry Beans data set archived on the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/data sets/Dry+Bean+data set) and researched by @KOKLU2020105507;. The objective of this data set is to correctly classify seven types of dry beans using 16 features which were extracted using computer vision. These features describe 12 dimension and 4 shape characteristics of each observation.
+
+The authors of the published research considered a number of classifers with overall accuracies ranging from 87.92% to 93.13%. The classifiers considered were Multilayer perceptron, Support Vector Machine, k_Nearest Neighbors and Decision Trees. The authors of the published research also made use of 10-fold cross validation.
+
+For the purpose of this project k-Nearest Neighbour, Random Forest and XGBoost classifiers were considered using 5-fold cross validation with hyper parameter tuning. The data set was split into training, validation and testing. This research obtained a best overall accuracy using random forests of 87.75% using XGBoost on the final hold-out (test) data set.
+
+This document proceeds with an overview of the data analysis undertaken (exploration, cleaning, visualisation and modelling). All findings are presented in the Results section, with final remarks found in Conclusion section. 
+
+```{r initial-setup, eval=FALSE}
+
+dl <- tempfile()
+download.file("https://github.com/frankieinguanez/harvardxDataScienceCapstoneCYD/raw/main/dryBean.csv", dl)
+
+d <- read.csv2(dl,header = TRUE, sep = ",", stringsAsFactors = FALSE)
+
+# Test set will be 20% 
+set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+test.index <- createDataPartition(y = d$Class, times = 1, p = 0.2, list = FALSE)
+beans <- d[-test.index,]
+test <- d[test.index,]
+
+# Clean-up
+rm(list=c("d", "test.index", "dl"))
+```
+\newpage
+# **Analysis**
+The analysis process is made up of the following stages: Exploratory Analysis; Data cleaning; Data Visualisation; Data Modelling.
+
+After downloading the data set it has been split with 20% for testing as the final hold-out data set. The remaining was split again with 20% for validation.
+
+## Exploratory Analysis
+
+The data set has `r ncol(beans)` features and after removing the hold-out data set a total of `r format(nrow(beans),big.mark=",",scientific=F)` observations were left. No missing values were found. The target variable is named Class, whilst all other variables are predictors. All predictors are continuous numeric variables, whilst the target should be a factor with 7 levels.
+
+```{r dataExploration, eval=FALSE}
+dim(beans)
+str(beans)
+summary(beans)
+```
+
+## Data Cleaning
+
+Two tasks were needed for data cleaning: first data type conversion of predictor variables to numeric and the target variable to a factor; secondly the normalization of values. The predictor variables had different range of values and thus needed to be normalized such that each had the same scale from 0 to 1.
+
+```{r dataCleaning, eval=FALSE}
+##########################################################
+# Data clean & transformation
+##########################################################
+
+beans$Perimeter <- as.numeric(beans$Perimeter)
+beans$MajorAxisLength <- as.numeric(beans$MajorAxisLength)
+beans$MinorAxisLength <- as.numeric(beans$MinorAxisLength)
+beans$AspectRation <- as.numeric(beans$AspectRation)
+beans$Eccentricity <- as.numeric(beans$Eccentricity)
+beans$ConvexArea <- as.numeric(beans$ConvexArea)
+beans$EquivDiameter <- as.numeric(beans$EquivDiameter)
+beans$Extent <- as.numeric(beans$Extent)
+beans$Solidity <- as.numeric(beans$Solidity)
+beans$roundness <- as.numeric(beans$roundness)
+beans$Compactness <- as.numeric(beans$Compactness)
+beans$ShapeFactor1 <- as.numeric(beans$ShapeFactor1)
+beans$ShapeFactor2 <- as.numeric(beans$ShapeFactor2)
+beans$ShapeFactor3 <- as.numeric(beans$ShapeFactor3)
+beans$ShapeFactor4 <- as.numeric(beans$ShapeFactor4)
+
+beans$Class <- as.factor(beans$Class)
+
+summary(beans)
+
+# Min Max scaling
+process <- preProcess(as.data.frame(beans), method=c("range"))
+beans <- predict(process, as.data.frame(beans))
+
+summary(beans)
+
+# Clean-up
+rm(process)
+```
+## Data Visualisation
+
+Data visualisation can be generally viewed in two steps. As seen in Figure \@ref(fig:targetClassDistribution) the distribution of the target classes is not balanced. For all predictor variables box plots were generated to determine whether any distinguishing features were observed. As seen in Figure \@ref(fig:areaBoxplot) the Bombay type of bean can be easily distinguished from features such as area, perimeter, axis length, convex area and equivalent diameter. Other features such as Extent and Solidity, shown in Figures \@ref(fig:extentBoxplot) and \@ref(fig:SolidityBoxplot), appear to be irrelevant since they do not offer any distinguishing information.
+
+```{r targetClassDistribution, fig.cap="Target Class Distribution"}
+beans %>%
+  ggplot(aes(Class)) +
+  geom_histogram(color=I("black"), stat="count") +
+  scale_y_continuous() +
+  labs(title = "Bean Class distribution", x = "Class", y = "Count")
+```
+
+```{r areaBoxplot, fig.cap="Box plot of Area per target class"}
+boxplot(Area~Class, data=beans)
+```
+
+```{r extentBoxplot, fig.cap="Box plot of Extent per target class"}
+boxplot(Extent~Class, data=beans)
+```
+
+```{r SolidityBoxplot, fig.cap="Box plot of Solidity per target class"}
+boxplot(Solidity~Class, data=beans)
+```
+
+## Data Modelling
+
+For data modelling the data set was split to retain 20% for validation and 80% used to train the models. 5-fold cross validation repeated for 3 times was used on three classifiers each with hyperparameter tuning. The first model is K-Nearest Neighbour with tuning of k from 1 to 50 in increments of 2. The second model is Random Forest with a tune length of 15. The last model is XGBoost with 100 and 200 rounds and different tree depth in increments of 5.
+```{r dataModelling, eval=FALSE}
+##########################################################
+# Data Modelling - This section takes very long to execute
+##########################################################
+
+# Data splitting
+
+# Val set will be 20%
+set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+val.index <- createDataPartition(y = beans$Class, times = 1, p = 0.2, list = FALSE)
+d.train <- beans[-val.index,]
+d.val <- beans[val.index,]
+
+# Clean-up
+rm(list=c("val.index"))
+
+# Defining cross validation
+repeat_cv <- trainControl(method='repeatedcv', 
+                          number=5, 
+                          repeats=3, 
+                          allowParallel = TRUE,
+                          verboseIter = FALSE,
+                          classProbs = TRUE)
+
+# KNN using
+knn <- train(Class ~ .,  
+             method = "knn", 
+             tuneGrid = data.frame(k = seq(1, 50, 2)), 
+             trControl = repeat_cv,
+             metric='Accuracy', 
+             data = d.train)
+plot(knn)
+knn
+
+# Random Forest
+rf <- train(Class ~ .,
+            method = "rf",
+            tuneLength  = 15,
+            trControl = repeat_cv,
+            metric='Accuracy', 
+            data = d.train)
+plot(rf)
+rf
+
+# XGBoost
+xgbGrid <- expand.grid(nrounds = c(100,200),
+                       max_depth = c(10, 15, 20, 25),
+                       colsample_bytree = seq(0.5, 0.9, length.out = 5),
+                       eta = 0.1,
+                       gamma=0,
+                       min_child_weight = 1,
+                       subsample = 1)
+
+xgb <- train(Class ~ .,
+             method = "xgbTree",
+             tuneGrid  = xgbGrid,
+             trControl = repeat_cv,
+             metric='Accuracy', 
+             data = d.train)
+plot(xgb)
+xgb
+```
+# **Results**
+
+```{r results, eval=FALSE}
+# Model evaluation to determine ideal using validation data set
+confusionMatrix(predict(knn, d.val), d.val$Class)
+confusionMatrix(predict(rf, d.val), d.val$Class)
+confusionMatrix(predict(xgb, d.val), d.val$Class)
+
+# Clean-up
+rm(list=c("xgbGrid", "repeat_cv"))
+
+# Save data image
+save.image("dryBeans.RData")
+
+##########################################################
+# Final evaluation
+##########################################################
+
+# Clean testing data set
+test$Perimeter <- as.numeric(test$Perimeter)
+test$MajorAxisLength <- as.numeric(test$MajorAxisLength)
+test$MinorAxisLength <- as.numeric(test$MinorAxisLength)
+test$AspectRation <- as.numeric(test$AspectRation)
+test$Eccentricity <- as.numeric(test$Eccentricity)
+test$ConvexArea <- as.numeric(test$ConvexArea)
+test$EquivDiameter <- as.numeric(test$EquivDiameter)
+test$Extent <- as.numeric(test$Extent)
+test$Solidity <- as.numeric(test$Solidity)
+test$roundness <- as.numeric(test$roundness)
+test$Compactness <- as.numeric(test$Compactness)
+test$ShapeFactor1 <- as.numeric(test$ShapeFactor1)
+test$ShapeFactor2 <- as.numeric(test$ShapeFactor2)
+test$ShapeFactor3 <- as.numeric(test$ShapeFactor3)
+test$ShapeFactor4 <- as.numeric(test$ShapeFactor4)
+
+test$Class <- as.factor(test$Class)
+
+summary(test)
+
+# Min Max scaling
+process <- preProcess(as.data.frame(test), method=c("range"))
+test <- predict(process, as.data.frame(test))
+
+summary(test)
+
+# Clean-up
+rm(process)
+
+# Apply best model to test data set
+confusionMatrix(predict(rf, test), test$Class)
+```
+
+```{r finalResults, eval=TRUE}
+knn.cf <- confusionMatrix(predict(knn, d.val), d.val$Class)
+rf.cf <- confusionMatrix(predict(rf, d.val), d.val$Class)
+xgb.cf <- confusionMatrix(predict(xgb, d.val), d.val$Class)
+final.cf <- confusionMatrix(predict(rf, test), test$Class)
+```
+
+The performance of the KNN model is shown in Figure \@ref(fig:knnPerformance). The best configuration has a k of 13 with an overall accuracy of `r knn.cf$overall["Accuracy"]` and a Kappa value of `r knn.cf$overall["Kappa"]`.
+```{r knnPerformance, fig.cap="Training Performance of KNN via Cross Validation"}
+plot(knn)
+```
+
+The performance of the Random Forest is shown in Figure \@ref(fig:rfPerformance). The best configuration has a mtry value of 5 with an overall accuracy of `r rf.cf$overall["Accuracy"]` and a Kappa value of `r rf.cf$overall["Kappa"]`.
+```{r rfPerformance, fig.cap="Training Performance of Random Forest via Cross Validation"}
+plot(rf)
+```
+
+The performance of the XGBoost is shown in Figure \@ref(fig:xgbPerformance). The best configuration has 100 rounds, max depth of 25 with an overall accuracy of `r xgb.cf$overall["Accuracy"]` and a Kappa value of `r xgb.cf$overall["Kappa"]`.
+```{r xgbPerformance, fig.cap="Training Performance of XGBoost via Cross Validation"}
+plot(xgb)
+```
+
+Based on these results XGBoost was considered as the best model. Prior to applying this model on the final hold-out data set, the same cleaning processes applied on the training and validation data sets were applied to the test data set. The final overall accuracy obtained was of `r final.cf$overall["Accuracy"]` and a Kappa value of `r final.cf$overall["Kappa"]`. The metrics for each class based on the final model are shown in Table \@ref(tab:finalEvaluation).
+
+```{r finalEvaluation}
+final.cf$byClass%>% 
+  as.data.frame %>% select("Sensitivity", "Specificity", "Precision", "Recall", "F1", "Prevalence")%>% kable(caption = "Final Model Class Evaluation",
+                   align = "lrr", booktabs = TRUE, format = "latex", linesep = "")
+```
+\newpage
+
+# **Conclusion**
+This research considered a published data set by @KOKLU2020105507; and archived on the UCI Machine Learning Repository. Three different classifier models were considered using 5-fold cross validation and hyper parameter tuning. A final overall accuracy of `r final.cf$overall["Accuracy"]` was achieved within range of the results obtained by the authors of the original research.
+
+In order to improve on the obtained results a cross validation configuration similar to the original authors of 10-folds can be considered. This was not due to the computational resource limitations encountered in this research. More complex classifiers such as Neural Networks and Support Vector Machines could yield better results, yet requiring more computational resources. Final recommendation is to consider dimension reduction and matrix factorization.
+
+\newpage
+# **References**

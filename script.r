@@ -86,16 +86,40 @@ summary(beans)
 rm(process)
 
 # Save data image
-save.image("cleaned.RData")
+save.image("dryBeans.RData")
 
 ##########################################################
 # Data visualisation
 ##########################################################
 
-# Check correalation and distribution. Take very long to render
-pairs.panels(beans[1:16])
+beans %>%
+  ggplot(aes(Class)) +
+  geom_histogram(color=I("black"), stat="count") +
+  scale_y_continuous() +
+  labs(title = "Bean Class distribution", x = "Class", y = "Count")
 
-# TODO histogram and boxplots
+
+boxplot(Area~Class, data=beans)
+boxplot(Perimeter~Class, data=beans)
+boxplot(MajorAxisLength~Class, data=beans)
+boxplot(MinorAxisLength~Class, data=beans)
+oxplot(ConvexArea~Class, data=beans)
+boxplot(EquivDiameter~Class, data=beans)
+
+boxplot(AspectRation~Class, data=beans)
+
+boxplot(Eccentricity~Class, data=beans)
+boxplot(Solidity~Class, data=beans)
+boxplot(roundness~Class, data=beans)
+
+boxplot(Extent~Class, data=beans)
+
+boxplot(Compactness~Class, data=beans)
+
+boxplot(ShapeFactor1~Class, data=beans)
+boxplot(ShapeFactor2~Class, data=beans)
+boxplot(ShapeFactor3~Class, data=beans)
+boxplot(ShapeFactor4~Class, data=beans)
 
 ##########################################################
 # Data Modelling - This section takes very long to execute
@@ -127,8 +151,8 @@ knn <- train(Class ~ .,
              trControl = repeat_cv,
              metric='Accuracy', 
              data = d.train)
-
 plot(knn)
+knn
 
 # Random Forest
 rf <- train(Class ~ .,
@@ -137,8 +161,8 @@ rf <- train(Class ~ .,
             trControl = repeat_cv,
             metric='Accuracy', 
             data = d.train)
-
 plot(rf)
+rf
 
 # XGBoost
 xgbGrid <- expand.grid(nrounds = c(100,200),
@@ -155,16 +179,19 @@ xgb <- train(Class ~ .,
              trControl = repeat_cv,
              metric='Accuracy', 
              data = d.train)
-
 plot(xgb)
+xgb
 
 # Model evaluation to determine ideal using validation dataset
 confusionMatrix(predict(knn, d.val), d.val$Class)
 confusionMatrix(predict(rf, d.val), d.val$Class)
 confusionMatrix(predict(xgb, d.val), d.val$Class)
 
+# Clean-up
+rm(list=c("xgbGrid", "repeat_cv"))
+
 # Save data image
-save.image("modelling.RData")
+save.image("dryBeans.RData")
 
 ##########################################################
 # Final evaluation
@@ -201,8 +228,6 @@ summary(test)
 rm(process)
 
 # Apply best model to test dataset
-#confusionMatrix(predict(knn, test), test$Class)
-confusionMatrix(predict(rf, test), test$Class)
-#confusionMatrix(predict(xgb, test), test$Class)
+confusionMatrix(predict(xgb, test), test$Class)
 
-save.image("final.RData")
+save.image("dryBeans.RData")
